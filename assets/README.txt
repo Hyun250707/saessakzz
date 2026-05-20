@@ -1,0 +1,10 @@
+Place
+your
+floor
+plan
+image
+as
+indoor_floor_plan.png
+in
+this
+folder.
