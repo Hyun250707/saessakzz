@@ -95,7 +95,7 @@ class _IndoorMapScreenState extends State<IndoorMapScreen> {
           _imageNaturalH = info.image.height.toDouble();
         });
       },
-      onError: (_, __) {
+      onError: (_, _) {
         if (!mounted) return;
         setState(() {
           _imageNaturalW = null;
@@ -578,7 +578,7 @@ class _IndoorMapScreenState extends State<IndoorMapScreen> {
       child: Image.asset(
         _mapData.imagePath,
         fit: BoxFit.contain,
-        errorBuilder: (_, __, ___) => Center(
+        errorBuilder: (_, _, _) => Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -979,7 +979,7 @@ class _IndoorMapScreenState extends State<IndoorMapScreen> {
                       },
                     );
                   },
-                  separatorBuilder: (_, __) => const Divider(height: 1),
+                  separatorBuilder: (_, _) => const Divider(height: 1),
                   itemCount: _mapData.edges.length,
                 ),
               ),

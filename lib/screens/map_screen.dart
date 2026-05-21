@@ -567,7 +567,7 @@ class _MapScreenState extends State<MapScreen> {
     int distance = info['totalDistance'] is int ? info['totalDistance'] : (info['totalDistance'] as num).toInt();
     
     int minutes = (seconds / 60).round();
-    String timeStr = minutes < 60 ? "${minutes}분" : "${minutes ~/ 60}시간 ${minutes % 60}분";
+    String timeStr = minutes < 60 ? "$minutes분" : "${minutes ~/ 60}시간 ${minutes % 60}분";
     String distStr = distance < 1000 ? "${distance}m" : "${(distance / 1000).toStringAsFixed(1)}km";
     
     return "$timeStr · $distStr";
@@ -736,8 +736,8 @@ class _MapScreenState extends State<MapScreen> {
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: isFirst
-                          ? _getRouteColor(selectedRouteType).withOpacity(0.1)
-                          : Colors.grey.withOpacity(0.05),
+                          ? _getRouteColor(selectedRouteType).withValues(alpha: 0.1)
+                          : Colors.grey.withValues(alpha: 0.05),
                       borderRadius: BorderRadius.circular(14),
                       border: isFirst
                           ? Border.all(
@@ -782,7 +782,7 @@ class _MapScreenState extends State<MapScreen> {
                     ),
                   );
                 },
-                separatorBuilder: (_, __) => const SizedBox(width: 10),
+                separatorBuilder: (_, _) => const SizedBox(width: 10),
                 itemCount: friendlyCues.length,
               ),
             ),
@@ -1201,7 +1201,7 @@ class _MapScreenState extends State<MapScreen> {
                 child: Row(
                   children: [
                     const Text("큰 글씨", style: TextStyle(fontWeight: FontWeight.bold)),
-                    Switch(value: largeTextMode, onChanged: (v) => setState(() => largeTextMode = v), activeColor: Colors.blue),
+                    Switch(value: largeTextMode, onChanged: (v) => setState(() => largeTextMode = v), activeThumbColor: Colors.blue),
                   ],
                 ),
               ),
@@ -1450,7 +1450,7 @@ class _MapScreenState extends State<MapScreen> {
                         margin: const EdgeInsets.only(bottom: 12),
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
-                          color: (currentStep['color'] as Color).withOpacity(0.15),
+                          color: (currentStep['color'] as Color).withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
                             color: currentStep['color'] as Color,
@@ -1582,7 +1582,7 @@ class _MapScreenState extends State<MapScreen> {
                           ),
                         ),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: _getRouteColor(selectedRouteType).withOpacity(0.8),
+                          backgroundColor: _getRouteColor(selectedRouteType).withValues(alpha: 0.8),
                           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),
@@ -1641,7 +1641,7 @@ class _MapScreenState extends State<MapScreen> {
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
+                            color: Colors.white.withValues(alpha: 0.2),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Icon(
@@ -1683,7 +1683,7 @@ class _MapScreenState extends State<MapScreen> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.1),
+                        color: Colors.white.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Row(
@@ -1755,7 +1755,7 @@ class _MapScreenState extends State<MapScreen> {
                           ),
                         ),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blue.withOpacity(0.8),
+                          backgroundColor: Colors.blue.withValues(alpha: 0.8),
                           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),
@@ -1793,7 +1793,7 @@ class _MapScreenState extends State<MapScreen> {
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(
-            color: isSelected ? color.withOpacity(0.1) : Colors.transparent,
+            color: isSelected ? color.withValues(alpha: 0.1) : Colors.transparent,
             borderRadius: BorderRadius.circular(12),
             border: isSelected ? Border.all(color: color, width: 2) : null,
           ),

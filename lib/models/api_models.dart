@@ -1,4 +1,3 @@
-import 'dart:convert';
 
 class LocationData {
   final String userId;
