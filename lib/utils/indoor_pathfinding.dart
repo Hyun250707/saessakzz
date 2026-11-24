@@ -3,15 +3,18 @@ import '../models/indoor_map.dart';
 
 /// 실내 그래프 위에서 A* 경로 탐색
 class IndoorPathfinding {
-  /// 두 핀 사이 직선 거리 (픽셀)
-  static double distance(IndoorPin a, IndoorPin b) {
-    return math.sqrt(math.pow(a.x - b.x, 2) + math.pow(a.y - b.y, 2));
+  /// 두 핀 사이 직선 거리.
+  /// 핀 좌표가 도면 기준 0~1 비율이면 가로와 세로의 실제 길이가 다르므로
+  /// yScale(도면 세로/가로 비율)을 곱해서 세로 거리를 가로와 같은 단위로 맞춤
+  static double distance(IndoorPin a, IndoorPin b, {double yScale = 1.0}) {
+    return math.sqrt(math.pow(a.x - b.x, 2) + math.pow((a.y - b.y) * yScale, 2));
   }
 
   /// 인접 리스트 생성: [핀id] -> [{연결된 핀id, 비용}]
   static Map<String, List<({String toId, double cost})>> _buildGraph(
     List<IndoorPin> pins,
     List<IndoorEdge> edges,
+    double yScale,
   ) {
     final pinIds = pins.map((p) => p.id).toSet();
     final mapPin = {for (var p in pins) p.id: p};
@@ -27,7 +30,7 @@ class IndoorPathfinding {
       if (!pinIds.contains(e.fromId) || !pinIds.contains(e.toId)) continue;
       final from = mapPin[e.fromId]!;
       final to = mapPin[e.toId]!;
-      final cost = e.weight > 0 ? e.weight : distance(from, to);
+      final cost = e.weight > 0 ? e.weight : distance(from, to, yScale: yScale);
       graph[e.fromId]!.add((toId: e.toId, cost: cost));
       graph[e.toId]!.add((toId: e.fromId, cost: cost));
     }
@@ -41,6 +44,7 @@ class IndoorPathfinding {
     required List<IndoorEdge> edges,
     required String startPinId,
     required String endPinId,
+    double yScale = 1.0,
   }) {
     if (pins.isEmpty) return [];
     final mapPin = {for (var p in pins) p.id: p};
@@ -51,8 +55,7 @@ class IndoorPathfinding {
       return [mapPin[startPinId]!];
     }
 
-    final graph = _buildGraph(pins, edges);
-    final start = mapPin[startPinId]!;
+    final graph = _buildGraph(pins, edges, yScale);
     final end = mapPin[endPinId]!;
 
     // A*: (f, g, nodeId, parentId)
@@ -61,7 +64,7 @@ class IndoorPathfinding {
     final gScore = <String, double>{startPinId: 0};
     final cameFrom = <String, String>{};
 
-    double heuristic(String id) => distance(mapPin[id]!, end);
+    double heuristic(String id) => distance(mapPin[id]!, end, yScale: yScale);
 
     open.add(_Node(f: heuristic(startPinId), g: 0, id: startPinId));
 

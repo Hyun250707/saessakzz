@@ -255,6 +255,7 @@ class _IndoorMapScreenState extends State<IndoorMapScreen> {
       edges: _mapData.edges,
       startPinId: _startPinId!,
       endPinId: _endPinId!,
+      yScale: _pinYScale,
     );
     setState(() => _path = path);
     if (path.isEmpty) {
@@ -264,6 +265,13 @@ class _IndoorMapScreenState extends State<IndoorMapScreen> {
       return;
     }
     _sendPathToDevice(path);
+  }
+
+  /// 핀 좌표가 0~1 비율이면 도면 세로/가로 비율, 픽셀 좌표면 1 (거리 계산용)
+  double get _pinYScale {
+    final normalized = _mapData.pins.every((p) => p.x <= 1 && p.y <= 1);
+    if (!normalized || _imageNaturalW == null || _imageNaturalH == null) return 1.0;
+    return _imageNaturalH! / _imageNaturalW!;
   }
 
   /// 경로 핀 좌표를 미터로 바꿔서 워치에 보냄. 서버가 워치 걸음 수(PDR)와 방위각으로 안내함.
