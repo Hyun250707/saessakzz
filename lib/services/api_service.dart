@@ -8,6 +8,9 @@ class ApiService {
   // 현재 연결된 Wi-Fi의 IP 주소로 업데이트
   static const String _baseUrl = "http://165.229.125.244:8000"; 
 
+  // 길안내를 받을 라즈베리파이 기기 ID (기기 쪽 PB_DEVICE_ID 와 같아야 함)
+  static const String deviceId = "pi-01";
+
   static final ApiService _instance = ApiService._internal();
   factory ApiService() => _instance;
   ApiService._internal();
@@ -152,5 +155,35 @@ class ApiService {
       print("Error loading indoor map: $e");
     }
     return null;
+  }
+
+  // 10. 기기에 길안내 경로 전송
+  // mode "gps": waypoints = [[위도, 경도], ...]
+  // mode "pdr": waypoints = [[x, y], ...] 출발점 기준 미터 좌표 (x=동쪽, y=북쪽)
+  Future<bool> startDeviceRoute(String mode, List<List<double>> waypoints) async {
+    try {
+      final response = await http
+          .post(
+            Uri.parse('$_baseUrl/api/devices/$deviceId/route'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'mode': mode, 'waypoints': waypoints}),
+          )
+          .timeout(const Duration(seconds: 3));
+      return response.statusCode == 200;
+    } catch (e) {
+      print("Error sending device route: $e");
+      return false;
+    }
+  }
+
+  // 11. 기기 길안내 종료
+  Future<void> stopDeviceRoute() async {
+    try {
+      await http
+          .delete(Uri.parse('$_baseUrl/api/devices/$deviceId/route'))
+          .timeout(const Duration(seconds: 3));
+    } catch (e) {
+      print("Error stopping device route: $e");
+    }
   }
 }

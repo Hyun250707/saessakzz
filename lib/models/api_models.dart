@@ -4,12 +4,14 @@ class LocationData {
   final double latitude;
   final double longitude;
   final String timestamp;
+  final String? deviceId; // 같이 보내면 서버가 그 기기의 GPS 길안내에 바로 반영
 
   LocationData({
     required this.userId,
     required this.latitude,
     required this.longitude,
     required this.timestamp,
+    this.deviceId,
   });
 
   Map<String, dynamic> toJson() => {
@@ -17,6 +19,7 @@ class LocationData {
         'latitude': latitude,
         'longitude': longitude,
         'timestamp': timestamp,
+        if (deviceId != null) 'device_id': deviceId,
       };
 }
 
