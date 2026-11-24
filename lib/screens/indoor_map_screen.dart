@@ -36,6 +36,7 @@ class _IndoorMapScreenState extends State<IndoorMapScreen> {
   final TransformationController _transformController = TransformationController();
   final GlobalKey _mapKey = GlobalKey();
   bool _isLoadingFromServer = false;
+  IndoorPin? _routeOrigin; // 워치로 보낸 경로의 출발 핀 (PDR 좌표 원점)
 
   /// 도면 PNG 원본 픽셀 크기 (BoxFit.contain 영역 계산용)
   double? _imageNaturalW;
@@ -277,22 +278,24 @@ class _IndoorMapScreenState extends State<IndoorMapScreen> {
   /// 경로 핀 좌표를 미터로 바꿔서 워치에 보냄. 서버가 워치 걸음 수(PDR)와 방위각으로 안내함.
   /// 도면은 위쪽이 북쪽이라고 가정 (이미지 y는 아래로 갈수록 커지니까 부호를 뒤집음)
   Future<void> _sendPathToDevice(List<IndoorPin> path) async {
-    final imgW = _imageNaturalW ?? 1, imgH = _imageNaturalH ?? 1;
-    final normalized = _mapData.pins.every((p) => p.x <= 1 && p.y <= 1);
-    final w = _mapData.widthMeters;
-    final h = w * imgH / imgW; // 도면 세로 실제 길이
-    final start = path.first;
-    double nx(IndoorPin p) => normalized ? p.x : p.x / imgW;
-    double ny(IndoorPin p) => normalized ? p.y : p.y / imgH;
-    final waypoints = path
-        .map((p) => [(nx(p) - nx(start)) * w, -(ny(p) - ny(start)) * h])
-        .toList();
-
+    _routeOrigin = path.first;
+    final waypoints = path.map((p) => _toMeters(p, path.first)).toList();
     final ok = await apiService.startDeviceRoute("pdr", waypoints);
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(ok ? '워치로 실내 길안내를 시작합니다. 출발 핀 위치에서 걸어 주세요.' : '워치에 경로를 보내지 못했어요. 서버와 워치 연결을 확인해 주세요.'),
     ));
+  }
+
+  /// 핀 좌표 -> origin 핀 기준 미터 좌표 [x=동쪽, y=북쪽]
+  List<double> _toMeters(IndoorPin p, IndoorPin origin) {
+    final imgW = _imageNaturalW ?? 1, imgH = _imageNaturalH ?? 1;
+    final normalized = _mapData.pins.every((p) => p.x <= 1 && p.y <= 1);
+    final w = _mapData.widthMeters;
+    final h = w * imgH / imgW; // 도면 세로 실제 길이
+    double nx(IndoorPin p) => normalized ? p.x : p.x / imgW;
+    double ny(IndoorPin p) => normalized ? p.y : p.y / imgH;
+    return [(nx(p) - nx(origin)) * w, -(ny(p) - ny(origin)) * h];
   }
 
   /// 도면 가로가 실제로 몇 m 인지 입력 (워치 실내 안내 거리 계산용)
@@ -323,6 +326,7 @@ class _IndoorMapScreenState extends State<IndoorMapScreen> {
 
   void _clearPath() {
     apiService.stopDeviceRoute();
+    _routeOrigin = null;
     setState(() {
       _startPinId = null;
       _endPinId = null;
@@ -346,6 +350,7 @@ class _IndoorMapScreenState extends State<IndoorMapScreen> {
       context: context,
       builder: (ctx) => _CameraRecognitionDialog(camera: cameras.first),
     );
+    if (!mounted) return;
 
     if (recognizedRoom != null && recognizedRoom.isNotEmpty) {
       if (recognizedRoom.startsWith("인식실패") || recognizedRoom.startsWith("에러:")) {
@@ -360,6 +365,20 @@ class _IndoorMapScreenState extends State<IndoorMapScreen> {
       }
 
       final match = _findBestMatchingPin(recognizedRoom);
+
+      // 워치로 길안내 중이면 경로는 그대로 두고, 걸음 수로 추정한 위치(PDR)만 인식한 호실로 보정
+      if (match != null && _routeOrigin != null && _path.isNotEmpty) {
+        final m = _toMeters(match, _routeOrigin!);
+        final ok = await apiService.correctDevicePosition(m[0], m[1]);
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(ok
+              ? "'$recognizedRoom호' 인식. 워치 위치를 ${match.name}(으)로 보정했습니다."
+              : '위치 보정을 서버에 보내지 못했어요.'),
+          backgroundColor: ok ? Colors.blueAccent : Colors.orange,
+        ));
+        return;
+      }
 
       if (match != null) {
         setState(() {

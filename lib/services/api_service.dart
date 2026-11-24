@@ -176,7 +176,24 @@ class ApiService {
     }
   }
 
-  // 11. 기기 길안내 종료
+  // 11. 기기 PDR 위치 보정 (OCR 로 호실을 인식했을 때, 경로 출발점 기준 미터 좌표)
+  Future<bool> correctDevicePosition(double x, double y) async {
+    try {
+      final response = await http
+          .post(
+            Uri.parse('$_baseUrl/api/devices/$deviceId/pdr/reset'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'x': x, 'y': y}),
+          )
+          .timeout(const Duration(seconds: 3));
+      return response.statusCode == 200;
+    } catch (e) {
+      print("Error correcting device position: $e");
+      return false;
+    }
+  }
+
+  // 12. 기기 길안내 종료
   Future<void> stopDeviceRoute() async {
     try {
       await http
