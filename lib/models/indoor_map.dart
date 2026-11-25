@@ -72,15 +72,12 @@ class IndoorMapData {
   final List<IndoorPin> pins;
   final List<IndoorEdge> edges;
   final String name;
-  /// 도면 이미지 가로가 실제로 몇 m 인지. 워치 길안내(PDR)에서 핀 좌표를 미터로 바꿀 때 씀
-  final double widthMeters;
 
   const IndoorMapData({
     required this.imagePath,
     required this.name,
     this.pins = const [],
     this.edges = const [],
-    this.widthMeters = 30.0,
   });
 
   IndoorMapData copyWith({
@@ -88,14 +85,12 @@ class IndoorMapData {
     String? name,
     List<IndoorPin>? pins,
     List<IndoorEdge>? edges,
-    double? widthMeters,
   }) {
     return IndoorMapData(
       imagePath: imagePath ?? this.imagePath,
       name: name ?? this.name,
       pins: pins ?? this.pins,
       edges: edges ?? this.edges,
-      widthMeters: widthMeters ?? this.widthMeters,
     );
   }
 
@@ -104,7 +99,6 @@ class IndoorMapData {
         'name': name,
         'pins': pins.map((e) => e.toJson()).toList(),
         'edges': edges.map((e) => e.toJson()).toList(),
-        'widthMeters': widthMeters,
       };
 
   factory IndoorMapData.fromJson(Map<String, dynamic> json) {
@@ -119,7 +113,6 @@ class IndoorMapData {
               ?.map((e) => IndoorEdge.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
-      widthMeters: (json['widthMeters'] as num?)?.toDouble() ?? 30.0,
     );
   }
 }

@@ -74,6 +74,9 @@ class _MapScreenState extends State<MapScreen> {
   
   // 🧭 라즈베리파이 방향 지시용 변수
   double myCurrentHeading = 0.0;
+  String _lastSentCommand = "";
+  bool _offRoute = false; // 워치에 경로 이탈을 알린 상태인지
+  int _lastSentDist = -1; // 워치에 마지막으로 보낸 남은 거리(m)
 
   @override
   void initState() {
@@ -206,13 +209,40 @@ class _MapScreenState extends State<MapScreen> {
       latitude: myPosition.latitude,
       longitude: myPosition.longitude,
       timestamp: DateTime.now().toIso8601String(),
-      deviceId: isNavigating ? ApiService.deviceId : null,
     ));
 
     if (success) {
       print("✅ 서버 전송 성공");
     } else {
       print("❌ 서버 전송 실패");
+    }
+  }
+
+  // ===========================================================================
+  // 📡 [서버 통신] 라즈베리파이로 실시간 방향(화살표) 전송
+  // ===========================================================================
+  Future<void> sendDirectionToServer(String directionCommand) async {
+    // 중복 전송 방지
+    if (_lastSentCommand == directionCommand) return;
+    if (await _postWatchCommand(directionCommand)) {
+      _lastSentCommand = directionCommand;
+      print('✅ 라즈베리파이 방향 갱신: $directionCommand');
+    }
+  }
+
+  // 워치로 보낼 명령을 서버에 전달 (TARGET 각도, 도착, 이탈, 복귀, DIST 남은 거리)
+  Future<bool> _postWatchCommand(String command) async {
+    try {
+      final url = Uri.parse("http://$serverIp:$serverPort/api/navi/direction");
+      await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'command': command}),
+      );
+      return true;
+    } catch (e) {
+      print('❌ 방향 서버 전송 에러: $e');
+      return false;
     }
   }
 
@@ -968,6 +998,9 @@ class _MapScreenState extends State<MapScreen> {
   // ---------------------------------------------------------
   void startNavigation() {
     if (routePoints.isEmpty) return;
+    _offRoute = false;
+    _lastSentDist = -1;
+    _lastSentCommand = "";
     setState(() { 
       isNavigating = true; 
       _currentPointIndex = 0;
@@ -976,7 +1009,6 @@ class _MapScreenState extends State<MapScreen> {
       subInstruction = "파란 화살표 방향으로 천천히 이동하세요.";
       currentTurnIcon = Icons.my_location;
     });
-    _sendRouteToDevice();
 
     // 프레임 보정: 1000ms(1초)에서 200ms(0.2초 = 5FPS)로 변경하여 라즈베리파이 화살표가 훨씬 부드럽게 갱신되도록 합니다.
     _navigationTimer = Timer.periodic(const Duration(milliseconds: 200), (timer) {
@@ -1069,33 +1101,65 @@ class _MapScreenState extends State<MapScreen> {
             }
           }
           
-          // 방향 안내(직진, 좌회전 등)는 서버가 워치의 방위각과 GPS 위치로 판단해서 워치에 직접 보냄
+          // 📡 [라즈베리파이 연동] 실시간 상대 방향 계산 및 전송
+          if (routePoints.length > _currentPointIndex + 1) {
+             // 1. 스마트폰의 안정적인 하드웨어 나침반 센서값(myCurrentHeading) 직접 사용! (GPS 튐 완벽 해결)
+             double myHeading = myCurrentHeading;
+             
+             // 2. 가야 할 목표 방향 (현재 위치 -> 다음 경로 노드)
+             LatLng targetPoint = routePoints[math.min(_currentPointIndex + 1, routePoints.length - 1)];
+             double targetBearing = _calculateBearing(myPosition, targetPoint);
+             
+             // 3. 각도 차이 계산 (상대 각도: -180 ~ +180)
+             double angleDiff = (targetBearing - myHeading + 540) % 360 - 180;
+             
+             // 🔥 [가장 중요한 핵심] 파이썬 PIL 라이브러리는 각도가 반대입니다!
+             // 라즈베리파이에서는 -90도가 오른쪽, +90도가 왼쪽을 의미합니다.
+             // 따라서 계산된 각도(angleDiff)의 부호를 뒤집어주어야 나침반처럼 정확히 목적지를 가리킵니다.
+             int roundedAngle = -(angleDiff.round());
+             
+             // 방향이 최소 3도 이상 변했을 때만 서버로 전송 (네트워크 과부하 방지)
+             String newCommand = "TARGET:$roundedAngle";
+             if (_lastSentCommand.isEmpty || !_lastSentCommand.startsWith("TARGET:")) {
+               sendDirectionToServer(newCommand);
+             } else {
+               int lastAngle = int.tryParse(_lastSentCommand.split(":")[1]) ?? 0;
+               if ((roundedAngle - lastAngle).abs() >= 3) {
+                 sendDirectionToServer(newCommand);
+               }
+             }
+          }
+          
+          // 📡 [라즈베리파이 연동] 경로 이탈, 복귀
+          // GPS 오차(약 10m)가 있어서 25m 넘게 벗어나면 이탈, 15m 안으로 돌아오면 복귀로 봄.
+          // 기준을 다르게 둬야 경계에서 이탈/복귀 알림이 번갈아 울리지 않음
+          if (!_offRoute && minDistance > 25) {
+            _offRoute = true;
+            _postWatchCommand("이탈");
+          } else if (_offRoute && minDistance < 15) {
+            _offRoute = false;
+            _postWatchCommand("복귀");
+          }
+
+          // 📡 [라즈베리파이 연동] 남은 거리 (워치 화면 표시용, 2m 이상 바뀔 때만 전송)
+          final distM = remainingDist.round();
+          if ((distM - _lastSentDist).abs() >= 2) {
+            _lastSentDist = distM;
+            _postWatchCommand("DIST:$distM");
+          }
 
           // 목적지 도착 판정 (10미터 이내)
           if (remainingDist < 10 && _currentPointIndex >= routePoints.length - 5) {
-            stopNavigation(arrived: true); // 워치 도착 알림은 서버가 이미 보냄
+            stopNavigation();
+            sendDirectionToServer("도착");
             _showErrorDialog("도착", "목적지에 도착했습니다! 🎉");
           }
         });
     });
   }
 
-  // 워치(라즈베리파이)에 경로를 보내면 서버가 GPS 위치와 비교해서 방향 안내를 자동으로 보냄
-  Future<void> _sendRouteToDevice() async {
-    final ok = await apiService.startDeviceRoute(
-      "gps",
-      routePoints.map((p) => [p.latitude, p.longitude]).toList(),
-    );
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(ok ? "워치로 길안내를 시작합니다" : "워치에 경로를 보내지 못했어요. 서버와 워치 연결을 확인해 주세요."),
-    ));
-    if (ok) sendLocationToServer(); // 현재 위치로 바로 첫 안내를 받기 위해
-  }
-
-  void stopNavigation({bool arrived = false}) {
+  void stopNavigation() {
     _navigationTimer?.cancel();
-    if (!arrived) apiService.stopDeviceRoute(); // 도착했으면 워치에 도착 화면을 그대로 둠
     setState(() { 
       isNavigating = false; 
       markerRotation = 0.0;
